@@ -48,4 +48,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_KEY }}
-          GITHUB_REPOSITORY: Neeeptunus/Folia
+          GITHUB_REPOSITORY: LangZongz/Folia
