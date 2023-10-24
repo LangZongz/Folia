@@ -1,17 +1,12 @@
 name: Auto Merge Upstream
 
-on:
-  schedule:
-    - cron: "0 0 * * *"
-  workflow_dispatch:
-
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           token: ${{ secrets.RELEASE_KEY }}
       - name: Set up Git
