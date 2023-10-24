@@ -1,5 +1,10 @@
 name: Auto Merge Upstream
 
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
