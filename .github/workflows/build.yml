@@ -27,4 +27,25 @@ jobs:
       - name: Apply Patches
         run: ./gradlew applyPatches
       - name: Build
-        run: ./gradlew build
+        run: ./gradlew createReobfBundlerJar createReobfPaperclipJar
+      - uses: "actions/upload-artifact@v3"
+        with:
+          name: "Folia"
+          path: "build/libs/*.jar"
+      - name: Set outputs
+        id: short_sha
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "build/libs/*.jar"
+          body: |
+            Commit ${{ steps.short_sha.outputs.sha_short }}
+            This release is automatically compiled by GitHub Actions
+          name: Folia Automation Compile ${{ steps.short_sha.outputs.sha_short }}
+          draft: false
+          tag_name: commit-${{ steps.short_sha.outputs.sha_short }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_KEY }}
+          GITHUB_REPOSITORY: LangZongz/Folia
