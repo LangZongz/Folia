@@ -1,88 +1,80 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import io.papermc.paperweight.tasks.RebuildGitPatches
 
 plugins {
-    java
-    `maven-publish`
-    id("io.papermc.paperweight.patcher") version "1.7.1"
+    java // TODO java launcher tasks
+    id("io.papermc.paperweight.patcher") version "2.0.0-beta.18"
 }
 
-val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
+paperweight {
+    upstreams.paper {
+        ref = providers.gradleProperty("paperRef")
 
-repositories {
-    mavenCentral()
-    maven(paperMavenPublicUrl) {
-        content { onlyForConfigurations(configurations.paperclip.name) }
-    }
-}
-
-dependencies {
-    remapper("net.fabricmc:tiny-remapper:0.10.2:fat")
-    decompiler("org.vineflower:vineflower:1.10.1")
-    paperclip("io.papermc:paperclip:3.0.3")
-}
-
-allprojects {
-    apply(plugin = "java")
-    apply(plugin = "maven-publish")
-
-    java {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
+        patchFile {
+            path = "paper-server/build.gradle.kts"
+            outputFile = file("folia-server/build.gradle.kts")
+            patchFile = file("folia-server/build.gradle.kts.patch")
+        }
+        patchFile {
+            path = "paper-api/build.gradle.kts"
+            outputFile = file("folia-api/build.gradle.kts")
+            patchFile = file("folia-api/build.gradle.kts.patch")
+        }
+        patchDir("paperApi") {
+            upstreamPath = "paper-api"
+            excludes = setOf("build.gradle.kts")
+            patchesDir = file("folia-api/paper-patches")
+            outputDir = file("paper-api")
         }
     }
 }
 
+val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
+
 subprojects {
-    tasks.withType<JavaCompile> {
-        options.encoding = Charsets.UTF_8.name()
-        options.release.set(21)
-    }
-    tasks.withType<Javadoc> {
-        options.encoding = Charsets.UTF_8.name()
-    }
-    tasks.withType<ProcessResources> {
-        filteringCharset = Charsets.UTF_8.name()
+    apply(plugin = "java-library")
+    apply(plugin = "maven-publish")
+
+    extensions.configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
     }
 
     repositories {
         mavenCentral()
         maven(paperMavenPublicUrl)
     }
-}
 
-paperweight {
-    serverProject.set(project(":folia-server"))
+    dependencies {
+        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+    }
 
-    remapRepo.set(paperMavenPublicUrl)
-    decompileRepo.set(paperMavenPublicUrl)
-
-    usePaperUpstream(providers.gradleProperty("paperRef")) {
-        withPaperPatcher {
-            apiPatchDir.set(layout.projectDirectory.dir("patches/api"))
-            apiOutputDir.set(layout.projectDirectory.dir("Folia-API"))
-
-            serverPatchDir.set(layout.projectDirectory.dir("patches/server"))
-            serverOutputDir.set(layout.projectDirectory.dir("Folia-Server"))
-        }
-        patchTasks.register("generatedApi") {
-            isBareDirectory = true
-            upstreamDirPath = "paper-api-generator/generated"
-            patchDir = layout.projectDirectory.dir("patches/generatedApi")
-            outputDir = layout.projectDirectory.dir("paper-api-generator/generated")
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
+    }
+    tasks.withType<JavaCompile>().configureEach  {
+        options.encoding = Charsets.UTF_8.name()
+        options.release = 21
+        options.isFork = true
+    }
+    tasks.withType<Javadoc>().configureEach  {
+        options.encoding = Charsets.UTF_8.name()
+    }
+    tasks.withType<ProcessResources>().configureEach  {
+        filteringCharset = Charsets.UTF_8.name()
+    }
+    tasks.withType<Test>().configureEach  {
+        testLogging {
+            showStackTraces = true
+            exceptionFormat = TestExceptionFormat.FULL
+            events(TestLogEvent.STANDARD_OUT)
         }
     }
-}
 
-tasks.generateDevelopmentBundle {
-    apiCoordinates.set("dev.folia:folia-api")
-    libraryRepositories.addAll(
-        "https://repo.maven.apache.org/maven2/",
-        paperMavenPublicUrl,
-    )
-}
-
-allprojects {
-    publishing {
+    extensions.configure<PublishingExtension> {
         repositories {
             maven("https://repo.papermc.io/repository/maven-snapshots/") {
                 name = "paperSnapshots"
@@ -92,18 +84,10 @@ allprojects {
     }
 }
 
-publishing {
-    if (project.hasProperty("publishDevBundle")) {
-        publications.create<MavenPublication>("devBundle") {
-            artifact(tasks.generateDevelopmentBundle) {
-                artifactId = "dev-bundle"
-            }
-        }
+allprojects {
+    tasks.withType<RebuildGitPatches>().configureEach {
+        filterPatches = false
     }
-}
-
-tasks.withType<RebuildGitPatches> {
-    filterPatches.set(false)
 }
 
 tasks.register("printMinecraftVersion") {
